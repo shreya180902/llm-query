@@ -3,21 +3,22 @@ import os
 
 load_dotenv()  
 
-!pip install -q cassio langchain openai streamlit
-!pip install -U langchain-community
-!pip install PyPDF2
+#!pip install -q cassio langchain openai streamlit
+#!pip install -U langchain-community
+#!pip install PyPDF2
 
 from langchain.vectorstores.cassandra import Cassandra
 from langchain.indexes.vectorstore import VectorStoreIndexWrapper
+from langchain.embeddings import HuggingFaceEmbeddings
+from langchain.text_splitter import CharacterTextSplitter
+from transformers import pipeline
+import ipywidgets as widgets
+from IPython.display import display
+from PyPDF2 import PdfReader
 import cassio
 
 ASTRA_DB_APPLICATION_TOKEN = os.environ.get("ASTRA_DB_APPLICATION_TOKEN")
 ASTRA_DB_ID = os.environ.get("ASTRA_DB_ID")
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
-
-import ipywidgets as widgets
-from IPython.display import display
-from PyPDF2 import PdfReader
 
 uploader = widgets.FileUpload(
     accept='.pdf',
@@ -47,13 +48,8 @@ for i, page in enumerate(pdfreader.pages):
 print(raw_text[:500])
 
 cassio.init(token=ASTRA_DB_APPLICATION_TOKEN, database_id=ASTRA_DB_ID)
-
-from langchain_openai import OpenAI, OpenAIEmbeddings
-
-llm = OpenAI(openai_api_key=OPENAI_API_KEY)
-embedding = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
-
-from langchain.embeddings import HuggingFaceEmbeddings
+#llm = OpenAI(openai_api_key=OPENAI_API_KEY)
+#embedding = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
 
 embedding = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
@@ -63,8 +59,6 @@ astra_vector_store = Cassandra(
     session=None,
     keyspace=None,
 )
-
-from langchain.text_splitter import CharacterTextSplitter
 
 text_splitter = CharacterTextSplitter(
     separator = "\n",
@@ -80,8 +74,7 @@ print("Inserted %i headlines." % len(texts[:50]))
 
 astra_vector_index = VectorStoreIndexWrapper(vectorstore=astra_vector_store)
 
-from transformers import pipeline
-
+qa_pipeline = pipeline("question-answering", model="deepset/roberta-base-squad2")
 summarizer = pipeline("summarization", model="t5-small")
 
 first_question = True
@@ -98,9 +91,7 @@ while True:
         continue
 
     first_question = False
-
     print("\nQUESTION: \"%s\"" % query_text)
-
     results = astra_vector_store.similarity_search_with_score(query_text, k=4)
 
     if results:
